@@ -9,16 +9,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.realmtest.databinding.ActivityBinding
 import com.example.realmtest.databinding.ItemUserBinding
 import com.example.realmtest.models.User
-import com.example.realmtest.utils.Utils
 import io.realm.kotlin.Realm
 import io.realm.kotlin.RealmConfiguration
-import io.realm.kotlin.ext.isFrozen
-import io.realm.kotlin.ext.isManaged
-import io.realm.kotlin.ext.isValid
-import io.realm.kotlin.ext.query
+import io.realm.kotlin.ext.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.lang.Exception
 
 class MainActivity : ComponentActivity() {
     private lateinit var binding: ActivityBinding
@@ -54,41 +49,84 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun logDiagnostics(user: User) {
+        println("Method name: ${Thread.currentThread().stackTrace.getOrNull(3)?.methodName}")
+        println("User ID: ${user.id.toHexString()}")
+        println("Username: ${user.userName}")
+        println("Password: ${user.password}")
+        try {
+            println("Managed: ${user.isManaged()}")
+        } catch (e: Exception) {
+        }
+        try {
+            println("Valid: ${user.isValid()}")
+        } catch (e: Exception) {
+        }
+        try {
+            println("Frozen: ${user.isFrozen()}")
+        } catch (e: Exception) {
+        }
+    }
+
     private fun deleteUser(user: User) {
+        logDiagnostics(user)
         realm.writeBlocking {
-            findLatest(user)?.let { delete(it) }
+            findLatestManaged(user, User::id)?.let {
+                logDiagnostics(it)
+                delete(it)
+            }
         }
     }
 
     private fun editUser(user: User) {
-        realm.writeBlocking {
-//            query<User>("${User::id.name} == $0", user.id).first().find()?.let {
-//                it.userName = Utils.randomString()
-//            }
-//            try {
-//                println("Managed: ${user.isManaged()}")
-//            } catch (e: Exception) {
-//            }
-//            try {
-//                println("Valid: ${user.isValid()}")
-//            } catch (e: Exception) {
-//            }
-//            try {
-//                println("Frozen: ${user.isFrozen()}")
-//            } catch (e: Exception) {
-//            }
-//            findLatest(user)?.let {
-//                println("Managed: ${it.isManaged()}")
-//                println("Valid: ${it.isValid()}")
-//                println("Frozen: ${it.isFrozen()}")
-//            }
-
-//            user.userName = Utils.randomString()
-//            findLatest(user)?.let{
-//                copyToRealm(user)
-//            }
-
+//        realm.query<User>("${User::id.name} == $0", user.id).first().find()?.let {
+//            println("Before update")
+//            logDiagnostics(it)
+//            println("========")
+//        }
+//
+        val person = realm.query<User>("${User::id.name} == $0", user.id).first().find()
+        val personCopy = person?.copyFromRealm()
+        personCopy?.let {
+            logDiagnostics(personCopy)
+            it.userName = "New User"
+            realm.writeBlocking {
+                val newPerson = upsert(it)
+                logDiagnostics(newPerson)
+            }
         }
+
+//        realm.writeBlocking {
+//            val newPerson = upsert(User().apply {
+//                userName = "Daniel"
+//                password = "ADs"
+//            })
+//            logDiagnostics(newPerson)
+//        }
+
+//        realm.writeBlocking {
+//            val new = upsert(User().apply {
+//                id = user.id
+//                userName = "Daniel"
+//                password = "heslo123"
+//            })
+//            println("New value")
+//            logDiagnostics(new)
+//            println("====")
+//
+//            val new2 = upsert(User().apply {
+//                userName = "Daniel"
+//                password = "heslo123"
+//            })
+//            println("New value2")
+//            logDiagnostics(new2)
+//            println("====2")
+//        }
+//
+//        realm.query<User>("${User::id.name} == $0", user.id).first().find()?.let {
+//            println("After update")
+//            logDiagnostics(it)
+//        }
     }
 
     inner class UsersAdapter(val onEditClick: (user: User) -> Unit, val onDeleteClick: (user: User) -> Unit) :
